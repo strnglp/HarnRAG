@@ -1,0 +1,11 @@
+bin/
+data
+data/
+include/
+lib/
+lib64
+lib64/
+__pycache__
+pyvenv.cfg
+share/
+storage_*/
