@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HarnGPT</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-log"></div>
+        <div id="user-input">
+            <textarea id="input-box" rows="2" placeholder="Message HarnGPT ('>' to follow up)"></textarea>
+            <button id="send-button">SEND</button>
+        </div>
+    </div>
+    <img id="bot-corner-image" src="/static/sword-manuscript.png"/>
+    <img id="top-corner-image" src="/static/sword-manuscript.png"/>
+    <script>
+     const chatLog = document.getElementById('chat-log');
+     const inputBox = document.getElementById('input-box');
+     const sendButton = document.getElementById('send-button');
+
+     function addMessageToChatLog(message, isUser = true) {
+       const msgElement = document.createElement('div');  // Change from 'pre' to 'div'
+       msgElement.innerHTML = message;
+       msgElement.style.color = isUser ? '#8e3e03' : 'black';
+       
+       chatLog.appendChild(msgElement);
+       chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the bottom
+     }
+     
+
+     async function sendMessage() {
+       const userInput = inputBox.value.trim();
+       if (!userInput) return;
+
+       sendButton.disabled = true;
+       sendButton.innerText = "🙏";
+       // Add user message to chat log
+       addMessageToChatLog(userInput);
+
+       // Clear input box
+       inputBox.value = '';
+
+       // Send user input to backend
+       try {
+         const response = await fetch('/process', {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+           },
+           body: JSON.stringify({ input: userInput }),
+         });
+         const data = await response.json();
+         sendButton.disabled = false;
+         sendButton.innerText = "SEND";
+         // Add server response to chat log
+         addMessageToChatLog(data.output, false);
+       } catch (error) {
+         console.error('Error:', error);
+         addMessageToChatLog('Error communicating with server.', false);
+       }
+     }
+
+     // Attach event listener to button
+     sendButton.addEventListener('click', sendMessage);
+
+     // Allow "Enter" key to send messages
+     inputBox.addEventListener('keypress', function (e) {
+       if (e.key === 'Enter' && !e.shiftKey) {
+         e.preventDefault(); // Prevent newline
+         sendMessage();
+       }
+     });
+    </script>
+</body>
+</html>
