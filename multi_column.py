@@ -1,4 +1,11 @@
 """
+EDIT: John Violano - Thu-Dec-19-2024
+I've done some specializing to handle 2 column layout block ordering
+I post-process the sorted text blocks to push any content that starts
+on the right side of the page to the end of the list. I needed this
+to keep continguous text together and prevent pymupdf from bleeding
+text between columns.
+
 This is an advanced PyMuPDF utility for detecting multi-column pages.
 It can be used in a shell script, or its main function can be imported and
 invoked as descript below.
@@ -145,7 +152,7 @@ def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):
 
         return [b for b in bboxes if b != None]
 
-    def clean_nblocks(nblocks):
+    def clean_nblocks(nblocks, page_width):
         """Do some elementary cleaning."""
 
         # 1. remove any duplicate blocks.
@@ -168,7 +175,7 @@ def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):
 
         # Iterate over bboxes, identifying segments with approx. same bottom value.
         # Replace every segment by its sorted version.
-        for i in range(1, len(nblocks)):
+        for i in range(0, len(nblocks)):
             b1 = nblocks[i]
             if abs(b1.y1 - y1) > 10:  # different bottom
                 if i1 > i0:  # segment length > 1? Sort it!
@@ -180,6 +187,20 @@ def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):
             i1 = i  # store current index
         if i1 > i0:  # segment waiting to be sorted
             nblocks[i0 : i1 + 1] = sorted(nblocks[i0 : i1 + 1], key=lambda b: b.x0)
+
+        if len(nblocks) > 1:
+            # Identify outliers
+            non_outliers = [nblocks[0]]
+            outliers = []
+            for i in range(0, len(nblocks)):
+                curr_bbox = nblocks[i]
+                if curr_bbox.x0  > page_width / 2:
+                    #print(f"moving outlier {curr_bbox.x0}")
+                    outliers.append(curr_bbox)
+                else:
+                    non_outliers.append(curr_bbox)
+            nblocks = non_outliers + outliers
+        
         return nblocks
 
     # extract vector graphics
@@ -214,6 +235,7 @@ def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):
         if line0["dir"] != (1, 0):  # only accept horizontal text
             vert_bboxes.append(bbox)
             continue
+
 
         srect = fitz.EMPTY_IRECT()
         for line in b["lines"]:
@@ -279,7 +301,7 @@ def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):
         bboxes[i] = None
 
     # do some elementary cleaning
-    nblocks = clean_nblocks(nblocks)
+    nblocks = clean_nblocks(nblocks, page.rect.width)
 
     # return identified text bboxes
     return nblocks
@@ -300,13 +322,13 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         footer_margin = int(sys.argv[2])
     else:  # use default vaue
-        footer_margin = 50
+        footer_margin = 80
 
     # check if header margin is given
     if len(sys.argv) > 3:
         header_margin = int(sys.argv[3])
     else:  # use default vaue
-        header_margin = 50
+        header_margin = 80
 
     # open document
     doc = fitz.open(filename)
@@ -328,10 +350,12 @@ if __name__ == "__main__":
 
             # write sequence number
             shape.insert_text(rect.tl + (5, 15), str(i), color=fitz.pdfcolor["red"])
+            #print(f"{page} #{i}: tl: {rect.tl}")
 
         # finish drawing / text with color red
         shape.finish(color=fitz.pdfcolor["red"])
         shape.commit()  # store to the page
+
 
     # save document with text bboxes
     doc.ez_save(filename.replace(".pdf", "-blocks.pdf"))

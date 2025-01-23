@@ -18,13 +18,21 @@ from history import query_with_follow_up
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 # This project uses Ollama for summarization of answers
 # https://ollama.com/search
-LLM_MODEL = "llama3.1"
-Settings.chunk_size = 512
-Settings.overlap = 50
-Settings.context_window = 20000
-Settings.num_output = 2048
+LLM_MODEL = "llama3.2"
+#LLM_MODEL = "phi3:medium"
+#LLM_MODEL = "gemma2:27b"
+# Chunk size wound up being very important to my RAG usecase
+# When it is too small llama-index will chunk Documents, which
+# I was creating at the page level, into multiple Documents.
+# This meant relevancy of each of these smaller Documents may
+# be computed without important context (from the rest of the page)
+# It's now set at a size that seems to give each page a Document
+Settings.chunk_size = 2048
+Settings.overlap = 512
+Settings.context_window = 16384
+Settings.num_output = 512
 Settings.embed_model = HuggingFaceEmbedding(
-    model_name=EMBEDDING_MODEL, 
+    model_name=EMBEDDING_MODEL,   
     device="cuda", 
     max_length=512,
     trust_remote_code=True
@@ -48,20 +56,117 @@ os.environ["TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL"] = "1" # amd ROCm support r
 ###
 data_path = "./data/" # source data
 storage_path = "./storage_" + EMBEDDING_MODEL.split("/")[1] # computed data
-#vector_index, keyword_index = get_embeddings(data_path, storage_path)
 ####
 #### User input loop for conversation
 ####
 # TODO: swap in a custom prompt when "lists" or quantities (all) are requested
 custom_qa_prompt_str = """
-Context information is below.
----------------------
+You are an expert at retrieving and organizing information from the provided context.
+Analyze the context carefully and answer the query comprehensively, using all relevant details.
+When relevant "spells" are called "ritual invocations" in the context of clerics/gods.
+Do not reference the context or keywords in your response.
+Always provide a complete and direct answer without notes or commentary.
+Prefer tables or lists when providing collections and respond using markdown.
+
+Context:
+
+[Acronyms start]
+FRP=Fantasy Role-Playing
+GM=Gamemaster
+NPC=Non-Player Character
+PC=Player Character
+AGL=Agility
+AUR=Aura
+CML=Comeliness or Convocation Mastery Level (when in the context of spells)
+DEX=Dexterity
+END=Endurance
+EYE=Eyesight
+HRG=Hearing
+INT=Intelligence
+MOR=Morality
+MOV=Move
+SML=Smell
+STA=Stamina
+STR=Strength
+VOI=Voice
+WIL=Will
+ML=Mastery Level
+EML=Effective Mastery Level
+OML=Opening Mastery Level
+SB=Skill Base
+SI=Skill Index
+CS=Critical Success
+MS=Marginal Success
+MF=Marginal Failure
+CF=Critical Failure
+IP=Injury Penalty
+FP=Fatigue Penalty
+EP=Encumbrance Penalty
+UP=Universal Penalty
+IL=Injury Level
+FL=Fatigue Level
+B=Blunt Aspect
+E=Edge Aspect
+P=Point Aspect
+F=Fire/Frost Aspect
+PP=Piety Point
+RML=Ritual Mastery Level
+RTL=Ritual Target Level in the context of Gods, Religion, and Rituals, or Research Target Level in the context of spells
+CSB=Convocation Skill Base
+CSI=Convocation Skill Index
+OP=Option Point
+TR=Tuzyn Reckoning
+COL=Columbia Games, Inc.
+Ahn=Ahnu
+Hir=Hirin
+Ang=Angberelius
+Lad=Lado
+Ara=Aralius
+Mas=Masara
+Fen=Feneri
+Nad=Nadai
+Sko=Skorus
+Tai=Tai
+Tar=Tarael
+Ula=Ulandus
+SMP=Skill Maintenance Points
+WAC=Weapon Attack Class
+WDC=Weapon Defense Class
+AML=Attack Mastery Level
+DML=Defense Mastery Level
+WQ=Weapon Quality
+WT=Weight
+A/D=Attack/Defense Classes
+HM=Hand Mode
+PR=Price
+Ab=Abdomen
+Bk=Back (Rear Tx Ab)
+Ca=Calves
+Ch=Chest(Front Tx Ab)
+El=Elbow
+Fa=Face
+Fo=Forearms
+Ft=Feet
+Gr=Groin
+Ha=Hands
+Hp=Hips
+Kn=Knees
+Nk=Neck
+Sh=Shoulders
+Sk=Skull
+Th=Thighs
+Tx=Thorax
+Ua=Upper Arms
+LQ=Land Quality
+AC=Gross Acres
+HD=Households
+[Acronyms end]
+
 {context_str}
-Note: Spells in the context of Gods, Clerics, or Religion are actually synonymous with Ritual Invocations.
----------------------
-After a comprehensive analysis of the context information, answer the query succinctly, summarizing as necessary.
-Do not reference the context or the context information.
-Query: {query_str}
+
+Query:
+{query_str}
+
 Answer:
 """
 custom_qa_prompt = PromptTemplate(custom_qa_prompt_str)

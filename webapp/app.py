@@ -63,7 +63,8 @@ def process_input(query_str):
     book_pages = defaultdict(set)
     for node in sorted_nodes:
         metadata = node.node.metadata
-        book_pages[metadata["file"]].add(metadata["page"])
+        book_pages[metadata["book"]].add(metadata["page"])
+        print(f"{metadata} - score: {node.score}")
 
     list_of_pairs = [
         [

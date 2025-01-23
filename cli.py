@@ -37,7 +37,7 @@ while True:
     book_pages = defaultdict(set)
     for node in sorted_nodes:
         metadata = node.node.metadata
-        book_pages[metadata["file"]].add(metadata["page"])
+        book_pages[metadata["f"]].add(metadata["p"])
 
 
     list_of_pairs = [
